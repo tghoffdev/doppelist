@@ -51,7 +51,7 @@ export default function Home() {
   const [isLoadingHtml5, setIsLoadingHtml5] = useState(false);
 
   // Preview settings
-  const [backgroundColor, setBackgroundColor] = useState("#0f0f23");
+  const [backgroundColor, setBackgroundColor] = useState("#18181b");
   const [recordingMode, setRecordingMode] = useState<RecordingMode>("clip");
   const [outputFormat, setOutputFormat] = useState<OutputFormat>("webm");
 

@@ -44,7 +44,7 @@ interface PreviewFrameProps {
 
 export const PreviewFrame = forwardRef<HTMLDivElement, PreviewFrameProps>(
   function PreviewFrame(
-    { width, height, tag, html5Url, isLoadingHtml5 = false, backgroundColor = "#0f0f23", onReady, onResize, suppressOverflowWarning = false, countdown = null },
+    { width, height, tag, html5Url, isLoadingHtml5 = false, backgroundColor = "#18181b", onReady, onResize, suppressOverflowWarning = false, countdown = null },
     ref
   ) {
   const mraid = useMRAID({ width, height });
