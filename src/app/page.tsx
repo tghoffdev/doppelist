@@ -82,6 +82,8 @@ export default function Home() {
   const [textElements, setTextElements] = useState<TextElement[]>([]);
   // Store text modifications to re-apply after reload (originalText -> currentText)
   const pendingTextModsRef = useRef<Map<string, string>>(new Map());
+  // Track which content we've already auto-opened audit panel for (to avoid re-opening on reload)
+  const autoOpenedForRef = useRef<string | null>(null);
 
   // Help highlight state
   type HighlightSection = "content" | "size" | "display" | "preview" | "audit" | null;
@@ -175,14 +177,24 @@ export default function Home() {
     setMraidEvents([]);
   }, [loadedTag, html5Url]);
 
-  // Auto-open audit panel when macros are detected or text elements exist
+  // Auto-open audit panel on initial load (not reload) when macros or text exist
   useEffect(() => {
+    // Create a content identity key
+    const contentKey = loadedTag || html5Url || null;
+
+    // Skip if no content or already auto-opened for this content
+    if (!contentKey || autoOpenedForRef.current === contentKey) {
+      return;
+    }
+
     const hasMacros = loadedTag ? detectMacros(loadedTag).length > 0 : false;
     const hasTextElements = textElements.length > 0;
+
     if (hasMacros || hasTextElements) {
       setAuditPanelOpen(true);
+      autoOpenedForRef.current = contentKey;
     }
-  }, [loadedTag, textElements]);
+  }, [loadedTag, html5Url, textElements]);
 
   // Update service worker config when dimensions change (for HTML5 content)
   useEffect(() => {
@@ -278,6 +290,7 @@ export default function Home() {
     setIsAdReady(false);
     setTagValue("");
     setTextElements([]); // Clear DCO text elements
+    autoOpenedForRef.current = null; // Reset so next content will auto-open
     // Also clear HTML5 content
     if (html5Url) {
       clearHtml5Ad();
