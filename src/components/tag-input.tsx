@@ -181,6 +181,82 @@ if (typeof(EB) == 'undefined') {
     ],
   },
   {
+    vendor: "Macro Examples",
+    color: "text-cyan-400",
+    samples: [
+      {
+        label: "Click & Cache Macros",
+        tag: `<script src="https://ads.example.com/serve.js?click=[CLICK_URL]&cache=%%CACHEBUSTER%%&ts=[TIMESTAMP]"></script>
+<div style="width:300px;height:250px;background:linear-gradient(135deg,#06b6d4,#0891b2);display:flex;align-items:center;justify-content:center;font-family:sans-serif;color:#fff;text-align:center;padding:20px;">
+  <div>
+    <div style="font-size:18px;font-weight:bold;margin-bottom:8px;">Macro Test</div>
+    <div style="font-size:11px;opacity:0.8;font-family:monospace;">[CLICK_URL]</div>
+    <div style="font-size:11px;opacity:0.8;font-family:monospace;">%%CACHEBUSTER%%</div>
+  </div>
+</div>`,
+      },
+      {
+        label: "Geo & Device Macros",
+        tag: `<script>
+var adConfig = {
+  geo: "[GEO_LOCATION]",
+  country: "%%COUNTRY%%",
+  city: "\${CITY}",
+  dma: "{{DMA}}",
+  device: "[DEVICE_ID]",
+  userAgent: "%%USER_AGENT%%"
+};
+</script>
+<div style="width:300px;height:250px;background:linear-gradient(135deg,#14b8a6,#0d9488);display:flex;align-items:center;justify-content:center;font-family:sans-serif;color:#fff;text-align:center;padding:20px;">
+  <div>
+    <div style="font-size:18px;font-weight:bold;margin-bottom:8px;">Geo Targeting</div>
+    <div style="font-size:10px;opacity:0.8;font-family:monospace;">[GEO_LOCATION] %%COUNTRY%%</div>
+    <div style="font-size:10px;opacity:0.8;font-family:monospace;">\${CITY} {{DMA}}</div>
+  </div>
+</div>`,
+      },
+      {
+        label: "Programmatic Macros",
+        tag: `<img src="https://pixel.example.com/imp?auction=%%AUCTION_ID%%&price=\${AUCTION_PRICE}&bid=[BID_PRICE]&win=%%WINNING_PRICE%%" width="1" height="1" />
+<script src="https://cdn.example.com/ad.js?placement=[PLACEMENT_ID]&site=%%SITE_ID%%&campaign=\${CAMPAIGN_ID}&creative={{CREATIVE_ID}}&line=[LINE_ITEM_ID]"></script>
+<div style="width:300px;height:250px;background:linear-gradient(135deg,#8b5cf6,#7c3aed);display:flex;align-items:center;justify-content:center;font-family:sans-serif;color:#fff;text-align:center;padding:20px;">
+  <div>
+    <div style="font-size:18px;font-weight:bold;margin-bottom:8px;">Programmatic</div>
+    <div style="font-size:10px;opacity:0.8;font-family:monospace;">%%AUCTION_ID%% \${AUCTION_PRICE}</div>
+    <div style="font-size:10px;opacity:0.8;font-family:monospace;">[PLACEMENT_ID] {{CREATIVE_ID}}</div>
+  </div>
+</div>`,
+      },
+      {
+        label: "All Formats",
+        tag: `<!-- Testing all macro formats -->
+<script>
+var macros = {
+  bracket: "[CLICK_URL]",
+  doublePercent: "%%CACHEBUSTER%%",
+  dollarBrace: "\${AUCTION_PRICE}",
+  doubleBrace: "{{CREATIVE_ID}}",
+  doubleBracket: "[[PLACEMENT_ID]]",
+  percentBrace: "%{SITE_ID}",
+  hash: "#RANDOM#",
+  underscore: "__TIMESTAMP__"
+};
+</script>
+<div style="width:300px;height:250px;background:linear-gradient(135deg,#ec4899,#d946ef);display:flex;align-items:center;justify-content:center;font-family:sans-serif;color:#fff;text-align:center;padding:20px;">
+  <div>
+    <div style="font-size:18px;font-weight:bold;margin-bottom:8px;">All Formats</div>
+    <div style="font-size:9px;opacity:0.8;font-family:monospace;line-height:1.6;">
+      [BRACKET] %%PERCENT%%<br/>
+      \${DOLLAR} {{BRACE}}<br/>
+      [[DOUBLE]] %{RUBY}<br/>
+      #HASH# __UNDER__
+    </div>
+  </div>
+</div>`,
+      },
+    ],
+  },
+  {
     vendor: "Generic MRAID",
     color: "text-gray-400",
     samples: [
