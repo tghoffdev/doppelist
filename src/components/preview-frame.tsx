@@ -7,6 +7,7 @@ import {
   forwardRef,
   useRef,
   useCallback,
+  useImperativeHandle,
 } from "react";
 import { useMRAID } from "@/hooks/use-mraid";
 import { CeltraFrame } from "@/components/celtra-frame";
@@ -42,7 +43,15 @@ interface PreviewFrameProps {
   countdown?: number | null;
 }
 
-export const PreviewFrame = forwardRef<HTMLDivElement, PreviewFrameProps>(
+/** Handle exposed by PreviewFrame ref */
+export interface PreviewFrameHandle {
+  /** Get the container div element */
+  getContainer: () => HTMLDivElement | null;
+  /** Get the iframe element (for MRAID tags) */
+  getIframe: () => HTMLIFrameElement | null;
+}
+
+export const PreviewFrame = forwardRef<PreviewFrameHandle, PreviewFrameProps>(
   function PreviewFrame(
     { width, height, tag, html5Url, isLoadingHtml5 = false, backgroundColor = "#18181b", onReady, onResize, suppressOverflowWarning = false, countdown = null },
     ref
@@ -52,6 +61,24 @@ export const PreviewFrame = forwardRef<HTMLDivElement, PreviewFrameProps>(
   const [html5Ready, setHtml5Ready] = useState(false);
   const [doesNotFit, setDoesNotFit] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const html5IframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Expose handle methods via ref
+  useImperativeHandle(ref, () => ({
+    getContainer: () => containerRef.current,
+    getIframe: () => {
+      // For MRAID tags, use the mraid hook's iframe
+      const mraidIframe = mraid.getIframe();
+      if (mraidIframe) return mraidIframe;
+      // For HTML5 content, use the html5 iframe ref
+      if (html5IframeRef.current) return html5IframeRef.current;
+      // For Celtra, try to find iframe in container
+      if (containerRef.current) {
+        return containerRef.current.querySelector("iframe");
+      }
+      return null;
+    },
+  }), [mraid]);
 
   // Check if ad fits within container
   const checkFit = useCallback(() => {
@@ -94,19 +121,12 @@ export const PreviewFrame = forwardRef<HTMLDivElement, PreviewFrameProps>(
     return () => window.removeEventListener("resize", checkFit);
   }, [checkFit]);
 
-  // Combine refs
-  const setRefs = useCallback(
+  // Set container ref
+  const setContainerRef = useCallback(
     (node: HTMLDivElement | null) => {
-      // Set local ref
       (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
-      // Forward ref
-      if (typeof ref === "function") {
-        ref(node);
-      } else if (ref) {
-        ref.current = node;
-      }
     },
-    [ref]
+    []
   );
 
   // Detect vendor from tag
@@ -210,7 +230,7 @@ export const PreviewFrame = forwardRef<HTMLDivElement, PreviewFrameProps>(
   if (html5Url) {
     return (
       <div
-        ref={setRefs}
+        ref={setContainerRef}
         className="relative flex items-center justify-center h-full min-h-[400px] rounded-lg"
         style={{ backgroundColor }}
       >
@@ -218,6 +238,7 @@ export const PreviewFrame = forwardRef<HTMLDivElement, PreviewFrameProps>(
         {doesNotFit && !suppressOverflowWarning && <OverflowWarning />}
         <div className="relative border border-border rounded overflow-hidden bg-white">
           <iframe
+            ref={html5IframeRef}
             src={html5Url}
             width={width}
             height={height}
@@ -244,7 +265,7 @@ export const PreviewFrame = forwardRef<HTMLDivElement, PreviewFrameProps>(
   if (tag && isCeltraWithPreview && vendorInfo) {
     return (
       <div
-        ref={setRefs}
+        ref={setContainerRef}
         className="relative flex items-center justify-center h-full min-h-[400px] rounded-lg"
         style={{ backgroundColor }}
       >
@@ -276,7 +297,7 @@ export const PreviewFrame = forwardRef<HTMLDivElement, PreviewFrameProps>(
 
   return (
     <div
-      ref={setRefs}
+      ref={setContainerRef}
       className="relative flex items-center justify-center h-full min-h-[400px] rounded-lg"
       style={{ backgroundColor }}
     >

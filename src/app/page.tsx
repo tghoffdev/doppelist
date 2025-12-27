@@ -11,11 +11,12 @@ import {
 } from "@/components/ui/tooltip";
 import { TagInput, type InputMode } from "@/components/tag-input";
 import { SizeSelector } from "@/components/size-selector";
-import { PreviewFrame } from "@/components/preview-frame";
+import { PreviewFrame, type PreviewFrameHandle } from "@/components/preview-frame";
 import { BackgroundColorPicker } from "@/components/background-color-picker";
 import { CaptureControls } from "@/components/capture-controls";
 import { MacroDrawer, MacroEdgeTab } from "@/components/macro-drawer";
 import { detectMacros } from "@/lib/macros/detector";
+import { scanTextElements, type TextElement } from "@/lib/dco/scanner";
 import {
   useRecorder,
   downloadVideo,
@@ -66,12 +67,13 @@ export default function Home() {
   // Countdown for reload-and-record
   const [countdown, setCountdown] = useState<number | null>(null);
 
-  // Macro drawer
+  // Macro drawer + DCO
   const [macroDrawerOpen, setMacroDrawerOpen] = useState(false);
   const detectedMacros = useMemo(() => detectMacros(tagValue), [tagValue]);
+  const [textElements, setTextElements] = useState<TextElement[]>([]);
 
-  // Ref for the preview frame (used for clip recording mode)
-  const previewFrameRef = useRef<HTMLDivElement>(null);
+  // Ref for the preview frame (used for clip recording mode and DCO scanning)
+  const previewFrameRef = useRef<PreviewFrameHandle>(null);
 
   // Batch capture sizes
   const [batchSizes, setBatchSizes] = useState<AdSize[]>([]);
@@ -195,6 +197,7 @@ export default function Home() {
     setLoadedTag(null);
     setIsAdReady(false);
     setTagValue("");
+    setTextElements([]); // Clear DCO text elements
     // Also clear HTML5 content
     if (html5Url) {
       clearHtml5Ad();
@@ -203,6 +206,19 @@ export default function Home() {
     }
   }, [html5Url]);
 
+  // Scan ad DOM for text elements
+  const scanAd = useCallback(() => {
+    const iframe = previewFrameRef.current?.getIframe();
+    if (iframe) {
+      // Delay slightly to ensure ad has fully rendered
+      setTimeout(() => {
+        const elements = scanTextElements(iframe);
+        setTextElements(elements);
+        console.log("[DCO] Scanned", elements.length, "text elements");
+      }, 500);
+    }
+  }, []);
+
   const handleAdReady = useCallback(() => {
     setIsAdReady(true);
     // If we're waiting for ad ready (reload-and-record), resolve the promise
@@ -210,7 +226,9 @@ export default function Home() {
       adReadyResolverRef.current();
       adReadyResolverRef.current = null;
     }
-  }, []);
+    // Auto-scan for DCO text elements
+    scanAd();
+  }, [scanAd]);
 
   const handleResize = useCallback((newWidth: number, newHeight: number) => {
     setWidth(newWidth);
@@ -218,7 +236,8 @@ export default function Home() {
   }, []);
 
   const handleScreenshot = useCallback(async () => {
-    if (!previewFrameRef.current) return;
+    const container = previewFrameRef.current?.getContainer();
+    if (!container) return;
 
     // Use ref to ensure we always have the latest dimensions
     const { width: currentWidth, height: currentHeight } = dimensionsRef.current;
@@ -227,7 +246,7 @@ export default function Home() {
     setIsStartingCapture(true);
     try {
       const result = await captureScreenshot({
-        element: previewFrameRef.current,
+        element: container,
         width: currentWidth,
         height: currentHeight,
       });
@@ -309,7 +328,7 @@ export default function Home() {
       if (recordingMode === "clip" && previewFrameRef.current) {
         // Use getter functions for dynamic dimensions
         cropConfig = {
-          element: () => previewFrameRef.current,
+          element: () => previewFrameRef.current?.getContainer() ?? null,
           width: () => dimensionsRef.current.width,
           height: () => dimensionsRef.current.height,
         };
@@ -344,7 +363,7 @@ export default function Home() {
         // Use getter functions so they always get the current element/dimensions
         // (the element changes when the preview reloads, dimensions change on resize)
         cropConfig = {
-          element: () => previewFrameRef.current,
+          element: () => previewFrameRef.current?.getContainer() ?? null,
           width: () => dimensionsRef.current.width,
           height: () => dimensionsRef.current.height,
         };
@@ -388,8 +407,7 @@ export default function Home() {
 
   // Helper to get the iframe element from the preview
   const getPreviewIframe = useCallback((): HTMLIFrameElement | null => {
-    if (!previewFrameRef.current) return null;
-    return previewFrameRef.current.querySelector("iframe");
+    return previewFrameRef.current?.getIframe() ?? null;
   }, []);
 
   return (
@@ -636,15 +654,19 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Macro Detection Tab + Drawer */}
+      {/* Tag Inspector Tab + Drawer */}
       <MacroEdgeTab
         macroCount={detectedMacros.length}
+        textCount={textElements.length}
         onClick={() => setMacroDrawerOpen(true)}
       />
       <MacroDrawer
         tag={tagValue}
         open={macroDrawerOpen}
         onOpenChange={setMacroDrawerOpen}
+        textElements={textElements}
+        onTextElementsChange={setTextElements}
+        onRescan={scanAd}
       />
     </div>
   );

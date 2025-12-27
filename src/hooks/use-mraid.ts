@@ -23,6 +23,7 @@ export interface UseMRAIDReturn {
   loadTag: (tag: string) => void;
   reload: () => void;
   clear: () => void;
+  getIframe: () => HTMLIFrameElement | null;
 }
 
 export function useMRAID(options: UseMRAIDOptions): UseMRAIDReturn {
@@ -132,6 +133,11 @@ export function useMRAID(options: UseMRAIDOptions): UseMRAIDReturn {
     }
   }, [loadTag]);
 
+  // Get the iframe element
+  const getIframe = useCallback((): HTMLIFrameElement | null => {
+    return instanceRef.current?.iframe ?? null;
+  }, []);
+
   // Resize when dimensions change
   useEffect(() => {
     if (instanceRef.current) {
@@ -156,5 +162,6 @@ export function useMRAID(options: UseMRAIDOptions): UseMRAIDReturn {
     loadTag,
     reload,
     clear,
+    getIframe,
   };
 }
