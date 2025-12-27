@@ -8,12 +8,14 @@ import { SizeSelector } from "@/components/size-selector";
 import { PreviewFrame } from "@/components/preview-frame";
 import { BackgroundColorPicker } from "@/components/background-color-picker";
 import { CaptureControls } from "@/components/capture-controls";
+import { InteractiveControls } from "@/components/interactive-controls";
 import {
   useRecorder,
   downloadVideo,
   type RecordingMode,
   type CropConfig,
 } from "@/hooks/use-recorder";
+import { useInteractiveMode } from "@/hooks/use-interactive-mode";
 import { captureScreenshot, downloadScreenshot } from "@/lib/capture/screenshot";
 import { createZipArchive, downloadBlob, type ZipFile } from "@/lib/capture/zip";
 import { useProcessing } from "@/hooks/use-processing";
@@ -101,6 +103,9 @@ export default function Home() {
       }
     },
   });
+
+  // Interactive mode hook for recording/replaying user interactions
+  const interactiveMode = useInteractiveMode();
 
   // Register service worker on mount for HTML5 zip support
   useEffect(() => {
@@ -366,6 +371,103 @@ export default function Home() {
     }
   }, [loadedTag, html5Url, recorder, recordingMode]);
 
+  // Helper to get the iframe element from the preview
+  const getPreviewIframe = useCallback((): HTMLIFrameElement | null => {
+    if (!previewFrameRef.current) return null;
+    return previewFrameRef.current.querySelector("iframe");
+  }, []);
+
+  // Interactive mode handlers
+  const handleInteractiveStart = useCallback(() => {
+    if (!previewFrameRef.current) {
+      console.error("No preview frame container");
+      return;
+    }
+    interactiveMode.startRecording({
+      container: previewFrameRef.current,
+      width,
+      height,
+    });
+  }, [interactiveMode, width, height]);
+
+  const handleInteractiveStop = useCallback(() => {
+    interactiveMode.stopRecording();
+  }, [interactiveMode]);
+
+  const handleInteractiveRender = useCallback(async () => {
+    if (!interactiveMode.hasEvents) return;
+
+    // Calculate the total duration we need to record
+    // (duration of recorded events + buffer for ad init + buffer at end)
+    const eventsDuration = interactiveMode.state.duration;
+    const bufferTime = 1000; // 1 second buffer at end
+
+    setIsStartingCapture(true);
+    try {
+      // Step 1: Prepare screen capture (shows permission dialog)
+      let cropConfig: CropConfig | null = null;
+      if (recordingMode === "clip") {
+        cropConfig = {
+          element: () => previewFrameRef.current,
+          width: () => dimensionsRef.current.width,
+          height: () => dimensionsRef.current.height,
+        };
+      }
+      await recorder.prepareRecording(cropConfig);
+
+      // Step 2: Reload the ad fresh
+      const adReadyPromise = new Promise<void>((resolve) => {
+        adReadyResolverRef.current = resolve;
+      });
+      setIsAdReady(false);
+      setPreviewKey((k) => k + 1);
+
+      // Step 3: Wait for ad to be ready
+      await adReadyPromise;
+
+      // Step 4: Small delay to let ad fully initialize
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Step 5: Start video recording
+      recorder.beginPreparedRecording();
+      const recordingStartTime = performance.now();
+
+      // Step 6: Try to replay events (may fail for cross-origin iframes)
+      const iframe = getPreviewIframe();
+      if (iframe) {
+        try {
+          await interactiveMode.replay(iframe);
+        } catch (replayError) {
+          console.warn("Event replay failed (cross-origin iframe?):", replayError);
+          // Continue anyway - we'll wait for the full duration
+        }
+      }
+
+      // Step 7: Ensure we record for at least the full duration of events
+      const elapsed = performance.now() - recordingStartTime;
+      const remainingTime = Math.max(0, eventsDuration - elapsed + bufferTime);
+      if (remainingTime > 0) {
+        console.log(`[Interactive] Waiting ${Math.round(remainingTime)}ms for full duration`);
+        await new Promise((resolve) => setTimeout(resolve, remainingTime));
+      }
+
+      // Step 8: Stop recording
+      await recorder.stopRecording();
+    } catch (error) {
+      console.error("Interactive render failed:", error);
+      // Try to clean up recording if it was started
+      if (recorder.state.isRecording) {
+        await recorder.stopRecording();
+      }
+    } finally {
+      setIsStartingCapture(false);
+    }
+  }, [interactiveMode, recorder, recordingMode, getPreviewIframe]);
+
+  const handleInteractiveClear = useCallback(() => {
+    interactiveMode.clear();
+  }, [interactiveMode]);
+
   return (
     <div className="h-screen bg-background overflow-hidden">
       <main className="container mx-auto px-4 py-4 h-full">
@@ -452,29 +554,44 @@ export default function Home() {
                   </span>
                 )}
               </div>
-              <CaptureControls
-                recordingState={recorder.state}
-                hasContent={(!!loadedTag || !!html5Url) && isAdReady}
-                onScreenshot={handleScreenshot}
-                onStartRecording={handleStartRecording}
-                onStopRecording={handleStopRecording}
-                onReloadAndRecord={handleReloadAndRecord}
-                isCapturing={isCapturing}
-                batchSizesCount={batchSizes.length}
-                onBatchScreenshot={handleBatchScreenshot}
-                batchProgress={batchProgress}
-                recordingMode={recordingMode}
-                onRecordingModeChange={setRecordingMode}
-                isRegionCaptureSupported={recorder.isRegionCaptureSupported}
-                isCountingDown={countdown !== null}
-                outputFormat={outputFormat}
-                onOutputFormatChange={setOutputFormat}
-                conversionProgress={
-                  processing.isProcessing
-                    ? { progress: processing.progress, status: processing.status }
-                    : null
-                }
-              />
+              <div className="flex items-center gap-4">
+                {/* Regular capture controls - hidden during interactive mode */}
+                {interactiveMode.state.mode === "idle" && (
+                  <CaptureControls
+                    recordingState={recorder.state}
+                    hasContent={(!!loadedTag || !!html5Url) && isAdReady}
+                    onScreenshot={handleScreenshot}
+                    onStartRecording={handleStartRecording}
+                    onStopRecording={handleStopRecording}
+                    onReloadAndRecord={handleReloadAndRecord}
+                    isCapturing={isCapturing}
+                    batchSizesCount={batchSizes.length}
+                    onBatchScreenshot={handleBatchScreenshot}
+                    batchProgress={batchProgress}
+                    recordingMode={recordingMode}
+                    onRecordingModeChange={setRecordingMode}
+                    isRegionCaptureSupported={recorder.isRegionCaptureSupported}
+                    isCountingDown={countdown !== null}
+                    outputFormat={outputFormat}
+                    onOutputFormatChange={setOutputFormat}
+                    conversionProgress={
+                      processing.isProcessing
+                        ? { progress: processing.progress, status: processing.status }
+                        : null
+                    }
+                  />
+                )}
+                {/* Interactive mode controls */}
+                <InteractiveControls
+                  state={interactiveMode.state}
+                  hasContent={(!!loadedTag || !!html5Url) && isAdReady}
+                  onStartRecording={handleInteractiveStart}
+                  onStopRecording={handleInteractiveStop}
+                  onRender={handleInteractiveRender}
+                  onClear={handleInteractiveClear}
+                  isRenderDisabled={isStartingCapture || recorder.state.isRecording}
+                />
+              </div>
             </div>
             {/* Preview Area */}
             <CardContent className="flex-1 p-4 overflow-hidden">
