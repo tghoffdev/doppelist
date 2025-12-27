@@ -463,6 +463,13 @@ export default function Home() {
   const handleReloadAndRecord = useCallback(async () => {
     if (!loadedTag && !html5Url) return;
 
+    // Store text modifications before reload so they persist
+    textElements.forEach(el => {
+      if (el.currentText !== el.originalText) {
+        pendingTextModsRef.current.set(el.originalText, el.currentText);
+      }
+    });
+
     setIsStartingCapture(true);
     try {
       // Step 1: Request screen capture permission first (shows dialog)
@@ -513,7 +520,7 @@ export default function Home() {
     } finally {
       setIsStartingCapture(false);
     }
-  }, [loadedTag, html5Url, recorder, recordingMode]);
+  }, [loadedTag, html5Url, recorder, recordingMode, textElements]);
 
   // Helper to get the iframe element from the preview
   const getPreviewIframe = useCallback((): HTMLIFrameElement | null => {
