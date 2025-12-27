@@ -9,12 +9,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { TagInput, type InputMode } from "@/components/tag-input";
 import { SizeSelector } from "@/components/size-selector";
 import { PreviewFrame, type PreviewFrameHandle } from "@/components/preview-frame";
 import { BackgroundColorPicker } from "@/components/background-color-picker";
 import { CaptureControls } from "@/components/capture-controls";
-import { AuditPanel, MRAIDEventCards, type MRAIDEvent } from "@/components/audit-panel";
+import { AuditPanel, type MRAIDEvent } from "@/components/audit-panel";
 import { scanTextElements, type TextElement } from "@/lib/dco/scanner";
 import { detectVendor } from "@/lib/vendors";
 import {
@@ -74,6 +79,10 @@ export default function Home() {
   // Audit panel + DCO
   const [auditPanelOpen, setAuditPanelOpen] = useState(false);
   const [textElements, setTextElements] = useState<TextElement[]>([]);
+
+  // Help highlight state
+  type HighlightSection = "content" | "size" | "display" | "preview" | "audit" | null;
+  const [highlightedSection, setHighlightedSection] = useState<HighlightSection>(null);
 
   // Check if current tag is cross-origin (Celtra preview, etc.)
   const isCrossOrigin = useMemo(() => {
@@ -495,75 +504,131 @@ export default function Home() {
 
             <div className="flex-1" />
 
-            {/* Action buttons */}
-            <div className="flex items-center gap-1">
+            {/* Author links */}
+            <div className="flex items-center gap-2">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button
-                    onClick={handleReload}
-                    disabled={!loadedTag && !html5Url}
-                    className="p-1 text-foreground/40 hover:text-foreground/80 hover:bg-foreground/10 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  <a
+                    href="https://tommyhoffman.io"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-foreground/40 hover:text-foreground/70 transition-colors text-[10px]"
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  </button>
+                    tommyhoffman.io
+                  </a>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="font-mono text-xs">
-                  <p>Reload ad</p>
+                  <p>Portfolio</p>
                 </TooltipContent>
               </Tooltip>
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={handleClear}
-                    disabled={!loadedTag && !html5Url}
-                    className="p-1 text-foreground/40 hover:text-foreground/80 hover:bg-foreground/10 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="font-mono text-xs">
-                  <p>Clear</p>
-                </TooltipContent>
-              </Tooltip>
-
-              <span className="text-foreground/20 mx-1">|</span>
+              <span className="text-foreground/20">|</span>
 
               <Tooltip>
                 <TooltipTrigger asChild>
                   <a
-                    href="https://github.com"
+                    href="https://x.com/tghoffdev"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-1 text-foreground/40 hover:text-foreground/70 hover:bg-foreground/5 rounded transition-colors"
+                    className="text-foreground/40 hover:text-foreground/70 transition-colors"
                   >
-                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                     </svg>
                   </a>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="font-mono text-xs">
-                  <p>View source</p>
+                  <p>@tghoffdev</p>
                 </TooltipContent>
               </Tooltip>
 
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <a
+                    href="https://www.linkedin.com/in/tommy-hoffman-73901466/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-foreground/40 hover:text-foreground/70 transition-colors"
+                  >
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                    </svg>
+                  </a>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="font-mono text-xs">
+                  <p>LinkedIn</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
 
-            <Tooltip>
-              <TooltipTrigger asChild>
+            <span className="text-foreground/20">|</span>
+
+            <Popover onOpenChange={(open) => !open && setHighlightedSection(null)}>
+              <PopoverTrigger asChild>
                 <span className="text-foreground/40 hover:text-foreground/70 cursor-help transition-colors">
                   [?]
                 </span>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" align="end" className="max-w-xs font-mono text-xs">
-                <p>Paste ad tags, render in MRAID sandbox, capture screenshots & video.</p>
-                <p className="text-muted-foreground mt-1">Supports Celtra, Google DCM, Flashtalking, Sizmek, and generic MRAID.</p>
-              </TooltipContent>
-            </Tooltip>
+              </PopoverTrigger>
+              <PopoverContent side="bottom" align="end" className="w-72 font-mono text-xs p-0 overflow-hidden">
+                <div className="px-3 py-2 border-b border-border bg-foreground/5">
+                  <p className="font-medium text-foreground">Mirrio Capture</p>
+                  <p className="text-muted-foreground text-[10px] mt-0.5">
+                    MRAID sandbox for ad tag preview & capture
+                  </p>
+                </div>
+                <div className="p-1">
+                  <div
+                    className="px-2 py-1.5 rounded hover:bg-foreground/5 cursor-default transition-colors"
+                    onMouseEnter={() => setHighlightedSection("content")}
+                    onMouseLeave={() => setHighlightedSection(null)}
+                  >
+                    <span className="text-cyan-400">Ad Content</span>
+                    <span className="text-foreground/50 ml-2">Paste tags or upload HTML5 zips</span>
+                  </div>
+                  <div
+                    className="px-2 py-1.5 rounded hover:bg-foreground/5 cursor-default transition-colors"
+                    onMouseEnter={() => setHighlightedSection("size")}
+                    onMouseLeave={() => setHighlightedSection(null)}
+                  >
+                    <span className="text-purple-400">Size</span>
+                    <span className="text-foreground/50 ml-2">Presets, custom dims, batch sizes</span>
+                  </div>
+                  <div
+                    className="px-2 py-1.5 rounded hover:bg-foreground/5 cursor-default transition-colors"
+                    onMouseEnter={() => setHighlightedSection("display")}
+                    onMouseLeave={() => setHighlightedSection(null)}
+                  >
+                    <span className="text-orange-400">Display</span>
+                    <span className="text-foreground/50 ml-2">Background & border colors</span>
+                  </div>
+                  <div
+                    className="px-2 py-1.5 rounded hover:bg-foreground/5 cursor-default transition-colors"
+                    onMouseEnter={() => setHighlightedSection("preview")}
+                    onMouseLeave={() => setHighlightedSection(null)}
+                  >
+                    <span className="text-blue-400">Preview</span>
+                    <span className="text-foreground/50 ml-2">Live render, capture tools</span>
+                  </div>
+                  <div
+                    className="px-2 py-1.5 rounded hover:bg-emerald-500/10 cursor-default transition-colors border border-transparent hover:border-emerald-500/30"
+                    onMouseEnter={() => {
+                      setHighlightedSection("audit");
+                      setAuditPanelOpen(true);
+                    }}
+                    onMouseLeave={() => setHighlightedSection(null)}
+                  >
+                    <span className="text-emerald-400">Audit</span>
+                    <span className="text-foreground/50 ml-2">Macros, text editing, MRAID events</span>
+                    <div className="text-[9px] text-emerald-400/60 mt-0.5">
+                      Click the tab on the right edge of the controls
+                    </div>
+                  </div>
+                </div>
+                <div className="px-3 py-2 border-t border-border bg-foreground/5 text-[10px] text-foreground/40">
+                  Supports Celtra, DCM, Flashtalking, Sizmek, generic MRAID
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </TooltipProvider>
       </header>
@@ -576,9 +641,9 @@ export default function Home() {
             <div className="w-[380px] shrink-0 space-y-2 overflow-y-auto">
 
               {/* Tag Input */}
-              <Card>
+              <Card className={`transition-all duration-300 ${highlightedSection === "content" ? "ring-2 ring-cyan-500/50 shadow-lg shadow-cyan-500/20" : ""}`}>
                 <CardHeader className="pb-1 pt-2 px-3">
-                  <CardTitle className="text-[10px] font-mono font-normal text-foreground/50 uppercase tracking-widest leading-none">Ad Content</CardTitle>
+                  <CardTitle className="text-[10px] font-mono font-normal text-cyan-400/70 uppercase tracking-widest leading-none">Ad Content</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0 px-3 pb-3">
                   <TagInput
@@ -594,9 +659,9 @@ export default function Home() {
               </Card>
 
               {/* Size Controls */}
-              <Card>
+              <Card className={`transition-all duration-300 ${highlightedSection === "size" ? "ring-2 ring-purple-500/50 shadow-lg shadow-purple-500/20" : ""}`}>
                 <CardHeader className="pb-1 pt-2 px-3">
-                  <CardTitle className="text-[10px] font-mono font-normal text-foreground/50 uppercase tracking-widest leading-none">Size</CardTitle>
+                  <CardTitle className="text-[10px] font-mono font-normal text-purple-400/70 uppercase tracking-widest leading-none">Size</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0 px-3 pb-3">
                   <SizeSelector
@@ -611,9 +676,9 @@ export default function Home() {
               </Card>
 
               {/* Preview Settings */}
-              <Card>
+              <Card className={`transition-all duration-300 ${highlightedSection === "display" ? "ring-2 ring-orange-500/50 shadow-lg shadow-orange-500/20" : ""}`}>
                 <CardHeader className="pb-1 pt-2 px-3">
-                  <CardTitle className="text-[10px] font-mono font-normal text-foreground/50 uppercase tracking-widest leading-none">Display</CardTitle>
+                  <CardTitle className="text-[10px] font-mono font-normal text-orange-400/70 uppercase tracking-widest leading-none">Display</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0 px-3 pb-3 space-y-3">
                   <div>
@@ -650,21 +715,24 @@ export default function Home() {
             </div>
 
             {/* Audit Panel - slides from right */}
-            <AuditPanel
-              tag={tagValue}
-              open={auditPanelOpen}
-              onOpenChange={setAuditPanelOpen}
-              textElements={textElements}
-              onTextElementsChange={setTextElements}
-              onRescan={scanAd}
-              isCrossOrigin={isCrossOrigin}
-              mraidEvents={mraidEvents}
-              onMacrosChange={handleMacrosChange}
-            />
+            <div className={`transition-all duration-300 ${highlightedSection === "audit" ? "ring-2 ring-emerald-500/50 shadow-lg shadow-emerald-500/20 rounded-lg" : ""}`}>
+              <AuditPanel
+                tag={tagValue}
+                open={auditPanelOpen}
+                onOpenChange={setAuditPanelOpen}
+                textElements={textElements}
+                onTextElementsChange={setTextElements}
+                onRescan={scanAd}
+                isCrossOrigin={isCrossOrigin}
+                mraidEvents={mraidEvents}
+                onMacrosChange={handleMacrosChange}
+                onReloadWithChanges={handleMacrosChange}
+              />
+            </div>
           </div>
 
           {/* Right Column - Preview */}
-          <Card className="flex flex-col h-full overflow-hidden">
+          <Card className={`flex flex-col h-full overflow-hidden transition-all duration-300 ${highlightedSection === "preview" ? "ring-2 ring-blue-500/50 shadow-lg shadow-blue-500/20" : ""}`}>
             {/* Actions Bar */}
             <div className="flex items-center justify-between px-4 py-2 border-b border-border">
               <div className="flex items-center gap-2">
@@ -674,6 +742,9 @@ export default function Home() {
                   size="sm"
                   disabled={!loadedTag && !html5Url}
                 >
+                  <svg className="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
                   Reload
                 </Button>
                 <Button
@@ -682,6 +753,9 @@ export default function Home() {
                   size="sm"
                   disabled={!loadedTag && !html5Url}
                 >
+                  <svg className="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
                   Clear
                 </Button>
                 {isAdReady && (
@@ -733,7 +807,6 @@ export default function Home() {
                   suppressOverflowWarning={isStartingCapture || recorder.state.isRecording || recorder.state.isProcessing || isCapturing}
                   countdown={countdown}
                 />
-                <MRAIDEventCards events={mraidEvents} />
               </div>
             </CardContent>
           </Card>

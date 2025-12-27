@@ -238,7 +238,7 @@ export const PreviewFrame = forwardRef<PreviewFrameHandle, PreviewFrameProps>(
         {countdown !== null && <CountdownOverlay />}
         {doesNotFit && !suppressOverflowWarning && <OverflowWarning />}
         <div
-          className="relative rounded overflow-hidden bg-white"
+          className="relative overflow-hidden bg-white"
           style={{ border: `1px solid ${borderColor}` }}
         >
           <iframe
@@ -276,7 +276,7 @@ export const PreviewFrame = forwardRef<PreviewFrameHandle, PreviewFrameProps>(
         {countdown !== null && <CountdownOverlay />}
         {doesNotFit && !suppressOverflowWarning && <OverflowWarning />}
         <div
-          className="relative rounded overflow-hidden bg-white"
+          className="relative overflow-hidden bg-white"
           style={{ border: `1px solid ${borderColor}` }}
         >
           <CeltraFrame
@@ -313,15 +313,25 @@ export const PreviewFrame = forwardRef<PreviewFrameHandle, PreviewFrameProps>(
       {/* Container for the MRAID iframe */}
       <div
         ref={mraid.containerRef}
-        className="relative rounded overflow-hidden bg-white"
+        className="relative overflow-hidden bg-white"
         style={{ width, height, border: `1px solid ${borderColor}` }}
       >
         {/* Show placeholder when no content loaded */}
         {!tag && !html5Url && !mraid.isLoading && !isLoadingHtml5 && (
-          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground bg-muted/50">
-            <p className="text-center px-4">
-              Load an ad tag or upload HTML5 to preview
-            </p>
+          <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/95">
+            <div className="text-center px-6">
+              <div className="mb-4 text-emerald-500/30">
+                <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <p className="font-mono text-sm text-foreground/40 mb-1">
+                No preview loaded
+              </p>
+              <p className="font-mono text-xs text-foreground/25">
+                Paste a tag or upload HTML5
+              </p>
+            </div>
           </div>
         )}
 

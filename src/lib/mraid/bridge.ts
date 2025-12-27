@@ -190,9 +190,7 @@ export function generateMRAIDBridge(options: MRAIDBridgeOptions): string {
     // Actions
     open: function(url) {
       mraid._notifyParent('open', [url]);
-      if (url) {
-        window.open(url, '_blank');
-      }
+      // Don't actually open - just notify parent for capture tool
     },
     close: function() {
       mraid._notifyParent('close');
@@ -200,10 +198,7 @@ export function generateMRAIDBridge(options: MRAIDBridgeOptions): string {
     },
     expand: function(url) {
       mraid._notifyParent('expand', [url]);
-      // No-op in mock - would expand the ad
-      if (url) {
-        window.open(url, '_blank');
-      }
+      // Don't actually expand - just notify parent for capture tool
     },
     resize: function() {
       mraid._notifyParent('resize');
@@ -213,9 +208,7 @@ export function generateMRAIDBridge(options: MRAIDBridgeOptions): string {
     // Video (MRAID 3.0)
     playVideo: function(url) {
       mraid._notifyParent('playVideo', [url]);
-      if (url) {
-        window.open(url, '_blank');
-      }
+      // Don't actually open - just notify parent for capture tool
     },
 
     // Store picture

@@ -50,6 +50,8 @@ interface AuditPanelProps {
   mraidEvents?: MRAIDEvent[];
   /** Callback when macros are edited - returns modified tag */
   onMacrosChange?: (modifiedTag: string) => void;
+  /** Callback to reload the ad with changes applied */
+  onReloadWithChanges?: (modifiedTag: string) => void;
 }
 
 export function AuditPanel({
@@ -62,38 +64,99 @@ export function AuditPanel({
   isCrossOrigin = false,
   mraidEvents = [],
   onMacrosChange,
+  onReloadWithChanges,
 }: AuditPanelProps) {
-  // Detect macros and create editable versions
-  const detectedMacros = useMemo(() => detectMacros(tag), [tag]);
+  // Track the "base tag" for macro detection - the original tag before any macro replacements
+  const [baseTag, setBaseTag] = useState(tag);
   const [macroValues, setMacroValues] = useState<Record<string, string>>({});
+
+  // Detect macros from the base tag (not the modified tag)
+  const detectedMacros = useMemo(() => detectMacros(baseTag), [baseTag]);
+
+  // Check if a tag could be derived from baseTag by applying current macro values
+  const isDerivedFromBase = useCallback((newTag: string) => {
+    if (!baseTag || !newTag) return false;
+    // Apply current macro values to baseTag and see if it matches the new tag
+    let derived = baseTag;
+    for (const [macroRaw, value] of Object.entries(macroValues)) {
+      if (value.trim()) {
+        derived = derived.split(macroRaw).join(value);
+      }
+    }
+    return derived === newTag;
+  }, [baseTag, macroValues]);
+
+  // Update base tag only when a completely new tag is loaded (not when macros are applied)
+  useEffect(() => {
+    if (!tag) {
+      setBaseTag("");
+      setMacroValues({});
+      return;
+    }
+
+    // If the new tag is derived from applying macros to baseTag, preserve state
+    if (isDerivedFromBase(tag)) {
+      return;
+    }
+
+    // Check if this looks like a new tag (contains macros not derived from baseTag)
+    const newMacros = detectMacros(tag);
+    const baseMacros = detectMacros(baseTag);
+
+    // If there are new macros that weren't in the base, it's a new tag
+    const hasNewMacros = newMacros.some(
+      nm => !baseMacros.find(bm => bm.raw === nm.raw)
+    );
+
+    // If base is empty, or there are new macros, it's a new tag
+    const isNewTag = !baseTag || hasNewMacros;
+
+    if (isNewTag) {
+      setBaseTag(tag);
+      setMacroValues({});
+      setLastTextModifiedTag(null);
+    }
+  }, [tag, baseTag, isDerivedFromBase]);
 
   const [activeTab, setActiveTab] = useState<"macros" | "text">("macros");
   const [showExport, setShowExport] = useState(false);
   const [copied, setCopied] = useState(false);
-
-  // Reset macro values when tag changes
-  useEffect(() => {
-    setMacroValues({});
-  }, [tag]);
+  // Store the last generated modified tag for text (persists after reload)
+  const [lastTextModifiedTag, setLastTextModifiedTag] = useState<string | null>(null);
 
   // Handle macro value change
   const handleMacroChange = useCallback((macroRaw: string, value: string) => {
     setMacroValues(prev => ({ ...prev, [macroRaw]: value }));
   }, []);
 
-  // Apply macro replacements to tag
-  const applyMacros = useCallback(() => {
-    let modifiedTag = tag;
+  // Get modified tag with macro replacements applied
+  const getModifiedTag = useCallback(() => {
+    let modifiedTag = baseTag;
     for (const [macroRaw, value] of Object.entries(macroValues)) {
       if (value.trim()) {
         modifiedTag = modifiedTag.split(macroRaw).join(value);
       }
     }
-    onMacrosChange?.(modifiedTag);
-  }, [tag, macroValues, onMacrosChange]);
+    return modifiedTag;
+  }, [baseTag, macroValues]);
+
+  // Apply macro replacements to tag (use baseTag so we always start from original)
+  const applyMacros = useCallback(() => {
+    onMacrosChange?.(getModifiedTag());
+  }, [getModifiedTag, onMacrosChange]);
+
+  // Reload ad with macro changes applied
+  const reloadWithChanges = useCallback(() => {
+    onReloadWithChanges?.(getModifiedTag());
+  }, [getModifiedTag, onReloadWithChanges]);
 
   // Check if any macros have values
   const hasMacroValues = Object.values(macroValues).some(v => v.trim());
+
+  // Clear all macro values
+  const clearMacroValues = useCallback(() => {
+    setMacroValues({});
+  }, []);
 
   // Handle text change for a specific element
   const handleTextChange = useCallback(
@@ -158,7 +221,7 @@ export function AuditPanel({
         <div className="w-[320px] h-full border-l border-border bg-background flex flex-col">
           {/* Header */}
           <div className="px-3 py-2 border-b border-border">
-            <span className="text-[10px] font-mono font-normal text-foreground/50 uppercase tracking-widest">
+            <span className="text-[10px] font-mono font-normal text-emerald-400/70 uppercase tracking-widest">
               Audit
             </span>
           </div>
@@ -194,6 +257,20 @@ export function AuditPanel({
               className="flex-1 overflow-y-auto px-3 pb-3 mt-0"
             >
               <div className="space-y-1 pt-2">
+                {/* Reload with changes button - at top */}
+                {hasMacroValues && onReloadWithChanges && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={reloadWithChanges}
+                    className="w-full mb-2 h-7 text-xs text-cyan-400 border-cyan-500/50 hover:bg-cyan-500/10"
+                  >
+                    <svg className="w-3 h-3 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Reload with changes
+                  </Button>
+                )}
                 {detectedMacros.length === 0 ? (
                   <div className="text-center py-6 text-foreground/40 text-sm">
                     <p>No macros detected</p>
@@ -208,14 +285,16 @@ export function AuditPanel({
                         {detectedMacros.length} macro{detectedMacros.length !== 1 ? "s" : ""} found
                       </div>
                       {hasMacroValues && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={applyMacros}
-                          className="h-5 px-2 text-[10px] text-emerald-400 border-emerald-500/50 hover:bg-emerald-500/10"
-                        >
-                          Apply
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearMacroValues}
+                            className="h-5 px-2 text-[10px] text-foreground/50 hover:text-foreground"
+                          >
+                            Clear
+                          </Button>
+                        </div>
                       )}
                     </div>
                     {detectedMacros.map((macro) => (
@@ -237,6 +316,24 @@ export function AuditPanel({
               className="flex-1 overflow-y-auto px-3 pb-3 mt-0"
             >
               <div className="space-y-2 pt-2">
+                {/* Reload with changes button - at top */}
+                {hasModifications && onReloadWithChanges && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const result = generateModifiedTag(tag, textElements);
+                      setLastTextModifiedTag(result.tag);
+                      onReloadWithChanges(result.tag);
+                    }}
+                    className="w-full mb-1 h-7 text-xs text-cyan-400 border-cyan-500/50 hover:bg-cyan-500/10"
+                  >
+                    <svg className="w-3 h-3 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Reload with changes
+                  </Button>
+                )}
                 {isCrossOrigin ? (
                   <div className="text-center py-6 text-foreground/40 text-sm">
                     <p>Text editing unavailable</p>
@@ -292,8 +389,8 @@ export function AuditPanel({
                       </div>
                     </div>
 
-                    {/* Export Section */}
-                    {hasModifications && (
+                    {/* Export Section - show if current modifications OR saved modified tag */}
+                    {(hasModifications || lastTextModifiedTag) && (
                       <div className="border border-border/50 rounded p-2 bg-foreground/5">
                         {!showExport ? (
                           <Button
@@ -302,7 +399,7 @@ export function AuditPanel({
                             onClick={() => setShowExport(true)}
                             className="w-full text-xs h-7"
                           >
-                            Generate Modified Tag
+                            {hasModifications ? "Generate Modified Tag" : "View Modified Tag"}
                           </Button>
                         ) : (
                           <div className="space-y-2">
@@ -322,7 +419,18 @@ export function AuditPanel({
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={handleCopy}
+                                  onClick={async () => {
+                                    const tagToCopy = hasModifications
+                                      ? (exportResult?.tag ?? "")
+                                      : (lastTextModifiedTag ?? "");
+                                    try {
+                                      await navigator.clipboard.writeText(tagToCopy);
+                                      setCopied(true);
+                                      setTimeout(() => setCopied(false), 2000);
+                                    } catch (err) {
+                                      console.error("Failed to copy:", err);
+                                    }
+                                  }}
                                   className="h-5 px-2 text-[10px]"
                                 >
                                   {copied ? "Copied!" : "Copy"}
@@ -330,7 +438,7 @@ export function AuditPanel({
                               </div>
                             </div>
 
-                            {(exportResult?.warnings?.length ?? 0) > 0 && exportResult && (
+                            {hasModifications && (exportResult?.warnings?.length ?? 0) > 0 && exportResult && (
                               <div className="text-[10px] text-amber-400 space-y-0.5">
                                 {exportResult.warnings.map((w, i) => (
                                   <div key={i}>⚠ {w}</div>
@@ -339,15 +447,22 @@ export function AuditPanel({
                             )}
 
                             <Textarea
-                              value={exportResult?.tag ?? ""}
+                              value={hasModifications ? (exportResult?.tag ?? "") : (lastTextModifiedTag ?? "")}
                               readOnly
                               className="h-24 text-[10px] font-mono bg-background/50 resize-none"
                             />
 
-                            <div className="text-[9px] text-foreground/40">
-                              {exportResult?.replacements ?? 0} replacement
-                              {(exportResult?.replacements ?? 0) !== 1 ? "s" : ""}
-                            </div>
+                            {hasModifications && (
+                              <div className="text-[9px] text-foreground/40">
+                                {exportResult?.replacements ?? 0} replacement
+                                {(exportResult?.replacements ?? 0) !== 1 ? "s" : ""}
+                              </div>
+                            )}
+                            {!hasModifications && lastTextModifiedTag && (
+                              <div className="text-[9px] text-foreground/40">
+                                Previously applied changes
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -367,34 +482,64 @@ export function AuditPanel({
               </div>
             </TabsContent>
           </Tabs>
+
+          {/* MRAID Events at bottom of panel */}
+          {mraidEvents.length > 0 && (
+            <div className="border-t border-border px-3 py-2 space-y-1.5 max-h-[200px] overflow-y-auto">
+              <div className="text-[10px] text-foreground/40 uppercase tracking-wider">
+                MRAID Events
+              </div>
+              {mraidEvents.slice(-5).map((event) => (
+                <div
+                  key={event.id}
+                  className="bg-foreground/5 border border-border/50 rounded px-2 py-1.5 animate-in slide-in-from-bottom-2 duration-300"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                    <code className="text-xs text-emerald-400">{event.type}</code>
+                  </div>
+                  {event.args && event.args.length > 0 && (
+                    <div className="text-[10px] text-foreground/50 mt-0.5 truncate pl-3.5">
+                      {JSON.stringify(event.args[0])}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Tab button on the right edge */}
-      <button
-        onClick={() => onOpenChange(!open)}
-        className={`
-          shrink-0 w-6 h-full border-l border-border
-          flex items-center justify-center
-          transition-colors duration-200
-          ${open
-            ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400"
-            : "bg-background hover:bg-foreground/5 text-foreground/50 hover:text-foreground/80"
-          }
-        `}
-      >
-        <span
-          className="text-[10px] font-mono uppercase tracking-widest whitespace-nowrap"
-          style={{ writingMode: "vertical-rl" }}
+      <div className="shrink-0 ml-1">
+        <button
+          onClick={() => onOpenChange(!open)}
+          className={`
+            w-6 h-full border-l border-border rounded-tr-md rounded-br-md
+            flex items-center justify-center
+            transition-all duration-200
+            ${open
+              ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400"
+              : "text-emerald-400/50 hover:text-emerald-400/80"
+            }
+          `}
+          style={!open ? {
+            background: "linear-gradient(to bottom, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0.15) 100%)"
+          } : undefined}
         >
-          Audit
-          {totalCount > 0 && !open && (
-            <span className="ml-1 text-[9px] bg-foreground/10 px-1 py-0.5 rounded">
-              {totalCount}
-            </span>
-          )}
-        </span>
-      </button>
+          <span
+            className="text-[10px] font-mono uppercase tracking-widest whitespace-nowrap"
+            style={{ writingMode: "vertical-rl" }}
+          >
+            Audit
+            {totalCount > 0 && !open && (
+              <span className="ml-1 text-[9px] bg-foreground/10 px-1 py-0.5 rounded">
+                {totalCount}
+              </span>
+            )}
+          </span>
+        </button>
+      </div>
     </div>
   );
 }
