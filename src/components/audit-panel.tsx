@@ -97,19 +97,12 @@ export function AuditPanel({
     stableHtml5MacrosRef.current = html5Macros;
   }
 
-  // Detect macros from the base tag + merge with HTML5 scanned macros
+  // Detect macros - only from HTML5 scanned content (skip tag-based detection to avoid false positives)
   const detectedMacros = useMemo(() => {
-    const tagMacros = detectMacros(baseTag);
-    // Merge and dedupe by name
-    const macroMap = new Map<string, DetectedMacro>();
-    for (const m of [...tagMacros, ...stableHtml5MacrosRef.current]) {
-      const key = `${m.format}:${m.name}`;
-      if (!macroMap.has(key)) {
-        macroMap.set(key, m);
-      }
-    }
-    return Array.from(macroMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [baseTag, html5MacrosKey]);
+    // Only use HTML5 scanned macros - tag-based detection causes too many false positives
+    // with vendor tags (Celtra, DCM, etc.) that have query params like &name=
+    return stableHtml5MacrosRef.current.sort((a, b) => a.name.localeCompare(b.name));
+  }, [html5MacrosKey]);
 
   // Ref to access macroValues without adding to effect dependencies
   const macroValuesRef = useRef(macroValues);
@@ -318,10 +311,21 @@ export function AuditPanel({
                 )}
                 {detectedMacros.length === 0 ? (
                   <div className="text-center py-6 text-foreground/40 text-sm">
-                    <p>No macros detected</p>
-                    <p className="text-xs mt-2 text-foreground/30">
-                      Detects [MACRO], %%MACRO%%, {"{{macro}}"}, __MACRO__, etc.
-                    </p>
+                    {isHtml5 ? (
+                      <>
+                        <p>No macros detected</p>
+                        <p className="text-xs mt-2 text-foreground/30">
+                          Scans for [MACRO], {"{{macro}}"}, __MACRO__, etc.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p>Macros available for HTML5 bundles</p>
+                        <p className="text-xs mt-2 text-foreground/30">
+                          Upload a .zip to detect and edit dynamic values
+                        </p>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <>
