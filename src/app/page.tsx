@@ -531,6 +531,11 @@ export default function Home() {
   const handleReload = useCallback(() => {
     if (loadedTag || html5Url) {
       setIsAdReady(false);
+      // Reset timing for fresh measurement
+      setComplianceData((prev) => ({
+        ...prev,
+        timing: { loadStart: Date.now() },
+      }));
       setPreviewKey((k) => k + 1);
     }
   }, [loadedTag, html5Url]);
