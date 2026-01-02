@@ -299,10 +299,7 @@ function generateTextReport(data: ProofPackData): string {
 
   if (data.macros.length > 0) {
     for (const macro of data.macros) {
-      lines.push(`  • ${macro.raw} (${macro.format})`);
-      if (macro.description) {
-        lines.push(`    ${macro.description}`);
-      }
+      lines.push(`  • ${macro.raw} (${macro.format}, ${macro.count}x)`);
     }
   } else {
     lines.push("No macros detected");
