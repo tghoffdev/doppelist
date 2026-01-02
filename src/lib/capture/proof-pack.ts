@@ -40,6 +40,10 @@ export interface ProofPackData {
   modifiedTag?: string;
   /** Text personalization changes */
   textChanges?: TextChange[];
+  /** Macro replacement values (for URL resolution) */
+  macroValues?: Record<string, string>;
+  /** Whether click macro fix was specifically applied via compliance */
+  clickMacroFixApplied?: boolean;
   /** Metadata */
   metadata: ProofMetadata;
 }
@@ -120,14 +124,42 @@ export async function generateProofPack(
     zip.file("compliance.json", complianceJson);
   }
 
-  // 4. Add event log
+  // 4. Add event log with resolved URLs
   const eventsJson = JSON.stringify(
-    data.events.map((e) => ({
-      type: e.type,
-      args: e.args,
-      timestamp: e.timestamp,
-      time: new Date(e.timestamp).toISOString(),
-    })),
+    data.events.map((e) => {
+      const eventData: Record<string, unknown> = {
+        type: e.type,
+        timestamp: e.timestamp,
+        time: new Date(e.timestamp).toISOString(),
+      };
+
+      // For click-related events, resolve URLs using macro values
+      const clickEvents = ["open", "window.open", "anchor"];
+      if (clickEvents.includes(e.type) && e.args?.[0]) {
+        const rawUrl = e.args[0] as string;
+        let resolvedUrl = rawUrl;
+
+        // Apply macro substitutions if we have macro values
+        if (data.macroValues) {
+          for (const [macroRaw, value] of Object.entries(data.macroValues)) {
+            if (value.trim()) {
+              resolvedUrl = resolvedUrl.split(macroRaw).join(value);
+            }
+          }
+        }
+
+        eventData.rawUrl = rawUrl;
+        eventData.resolvedUrl = resolvedUrl !== rawUrl ? resolvedUrl : rawUrl;
+        // Keep remaining args (e.g., target for window.open)
+        if (e.args.length > 1) {
+          eventData.args = e.args.slice(1);
+        }
+      } else {
+        eventData.args = e.args;
+      }
+
+      return eventData;
+    }),
     null,
     2
   );
@@ -151,15 +183,18 @@ export async function generateProofPack(
   // 5b. Add personalization data
   const hasTextChanges = data.textChanges && data.textChanges.length > 0;
   const hasTagModification = data.modifiedTag && data.modifiedTag !== data.originalTag;
-  
-  if (hasTextChanges || hasTagModification) {
+  const hasMacroValues = data.macroValues && Object.values(data.macroValues).some(v => v.trim());
+
+  if (hasTextChanges || hasTagModification || hasMacroValues) {
     const personalizationJson = JSON.stringify(
       {
         tagModified: hasTagModification,
         textChanges: data.textChanges || [],
+        macroValues: hasMacroValues ? data.macroValues : undefined,
         summary: {
           textChangesCount: data.textChanges?.length || 0,
-          tagFixApplied: hasTagModification,
+          macroValuesApplied: hasMacroValues,
+          clickMacroFixApplied: data.clickMacroFixApplied || false,
         },
       },
       null,
@@ -267,28 +302,46 @@ function generateTextReport(data: ProofPackData): string {
   lines.push("");
 
   // Personalization & Tag Modifications
-  const hasTextChanges = data.textChanges && data.textChanges.length > 0;
-  const hasTagMod = data.modifiedTag && data.modifiedTag !== data.originalTag;
-  
-  if (hasTextChanges || hasTagMod) {
+  const reportHasTextChanges = data.textChanges && data.textChanges.length > 0;
+  const reportHasTagMod = data.modifiedTag && data.modifiedTag !== data.originalTag;
+  const reportHasMacroValues = data.macroValues && Object.values(data.macroValues).some(v => v.trim());
+
+  if (reportHasTextChanges || reportHasTagMod || reportHasMacroValues || data.clickMacroFixApplied) {
     lines.push("───────────────────────────────────────────────────────────────");
-    lines.push("PERSONALIZATION");
+    lines.push("PERSONALIZATION & MODIFICATIONS");
     lines.push("───────────────────────────────────────────────────────────────");
-    
-    if (hasTagMod) {
-      lines.push("  ✓ Tag was modified (fix applied)");
-      lines.push("    • Original tag: tag-original.html");
-      lines.push("    • Modified tag: tag-modified.html");
+
+    // Click macro fix (compliance fix)
+    if (data.clickMacroFixApplied) {
+      lines.push("  ✓ Click macro fix applied (via compliance)");
     }
-    
-    if (hasTextChanges) {
+
+    // Macro value replacements
+    if (reportHasMacroValues && data.macroValues) {
+      const filledMacros = Object.entries(data.macroValues).filter(([, v]) => v.trim());
+      lines.push(`  ✓ ${filledMacros.length} macro value(s) replaced:`);
+      for (const [macroRaw, value] of filledMacros) {
+        lines.push(`    • ${macroRaw} → ${value}`);
+      }
+    }
+
+    // Text personalization
+    if (reportHasTextChanges) {
       lines.push(`  ✓ ${data.textChanges!.length} text element(s) personalized:`);
       for (const change of data.textChanges!) {
         const typeLabel = change.type ? ` [${change.type}]` : "";
         lines.push(`    • "${change.original}" → "${change.current}"${typeLabel}`);
       }
     }
-    
+
+    // Tag files
+    if (reportHasTagMod) {
+      lines.push("");
+      lines.push("  Modified tag files:");
+      lines.push("    • Original: tag-original.html");
+      lines.push("    • Modified: tag-modified.html");
+    }
+
     lines.push("");
   }
 
@@ -313,11 +366,35 @@ function generateTextReport(data: ProofPackData): string {
   lines.push("───────────────────────────────────────────────────────────────");
 
   if (data.events.length > 0) {
+    const clickEvents = ["open", "window.open", "anchor"];
     for (const event of data.events.slice(0, 50)) {
       // Limit to 50 events
       const time = new Date(event.timestamp).toLocaleTimeString();
-      const args = event.args?.length ? ` → ${JSON.stringify(event.args)}` : "";
-      lines.push(`  ${time} | ${event.type}${args}`);
+
+      // For click events, show resolved URL if macro values are available
+      if (clickEvents.includes(event.type) && event.args?.[0]) {
+        const rawUrl = event.args[0] as string;
+        let resolvedUrl = rawUrl;
+
+        if (data.macroValues) {
+          for (const [macroRaw, value] of Object.entries(data.macroValues)) {
+            if (value.trim()) {
+              resolvedUrl = resolvedUrl.split(macroRaw).join(value);
+            }
+          }
+        }
+
+        if (resolvedUrl !== rawUrl) {
+          lines.push(`  ${time} | ${event.type}`);
+          lines.push(`           raw: ${rawUrl}`);
+          lines.push(`           resolved: ${resolvedUrl}`);
+        } else {
+          lines.push(`  ${time} | ${event.type} → ${rawUrl}`);
+        }
+      } else {
+        const args = event.args?.length ? ` → ${JSON.stringify(event.args)}` : "";
+        lines.push(`  ${time} | ${event.type}${args}`);
+      }
     }
     if (data.events.length > 50) {
       lines.push(`  ... and ${data.events.length - 50} more events`);
@@ -342,12 +419,11 @@ function generateTextReport(data: ProofPackData): string {
   if (data.compliance) lines.push("  • compliance.json");
   lines.push("  • events.json");
   if (data.macros.length > 0) lines.push("  • macros.json");
-  if ((data.textChanges && data.textChanges.length > 0) || 
-      (data.modifiedTag && data.modifiedTag !== data.originalTag)) {
+  if (reportHasTextChanges || reportHasTagMod || reportHasMacroValues || data.clickMacroFixApplied) {
     lines.push("  • personalization.json");
   }
   if (data.originalTag) lines.push("  • tag-original.html");
-  if (data.modifiedTag && data.modifiedTag !== data.originalTag) {
+  if (reportHasTagMod) {
     lines.push("  • tag-modified.html");
   }
 

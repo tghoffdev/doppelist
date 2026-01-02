@@ -138,6 +138,10 @@ export default function Home() {
   const [selectedDSP, setSelectedDSP] = useState("generic");
   const complianceEngineRef = useRef(new ComplianceEngine("generic"));
 
+  // Track click macro fix and macro values for proof pack
+  const [clickMacroFixApplied, setClickMacroFixApplied] = useState(false);
+  const [macroValues, setMacroValues] = useState<Record<string, string>>({});
+
   // Processing hook for MP4 conversion
   const processing = useProcessing();
 
@@ -438,6 +442,8 @@ export default function Home() {
     setMraidEvents([]);
     setComplianceResult(null);
     setIsExpanded(false); // Reset expanded state on new content
+    setClickMacroFixApplied(false); // Reset click macro fix tracking
+    setMacroValues({}); // Reset macro values
   }, [loadedTag, html5Url]);
 
   // Reset expanded state when format type changes
@@ -1290,6 +1296,8 @@ export default function Home() {
         originalTag: originalTag ?? undefined,
         modifiedTag,
         textChanges: hasTextChanges ? capturedTextChanges : undefined,
+        macroValues,
+        clickMacroFixApplied,
         metadata: {
           timestamp: new Date().toLocaleString(),
           timestampISO: new Date().toISOString(),
@@ -1326,16 +1334,18 @@ export default function Home() {
       }, 3000);
     }
   }, [
-    loadedTag, 
-    html5Url, 
-    proofCollectionState, 
-    handleRunCompliance, 
-    recorder, 
+    loadedTag,
+    html5Url,
+    proofCollectionState,
+    handleRunCompliance,
+    recorder,
     outputFormat,
     complianceResult,
     mraidEvents,
     html5Macros,
     selectedDSP,
+    macroValues,
+    clickMacroFixApplied,
   ]);
 
   // Helper to get the iframe element from the preview
@@ -1674,6 +1684,8 @@ export default function Home() {
                 hasContent={!!(loadedTag || html5Url)}
                 onCollectProof={handleCollectProof}
                 proofCollectionState={proofCollectionState}
+                onClickMacroFixApplied={() => setClickMacroFixApplied(true)}
+                onMacroValuesChange={setMacroValues}
               />
             </div>
           </div>

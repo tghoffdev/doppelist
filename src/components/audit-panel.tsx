@@ -88,6 +88,10 @@ interface AuditPanelProps {
   onCollectProof?: () => void;
   /** Current proof collection state */
   proofCollectionState?: ProofCollectionState;
+  /** Callback when click macro fix is applied via compliance */
+  onClickMacroFixApplied?: () => void;
+  /** Callback when macro values change (for proof pack URL resolution) */
+  onMacroValuesChange?: (values: Record<string, string>) => void;
 }
 
 export function AuditPanel({
@@ -113,10 +117,17 @@ export function AuditPanel({
   hasContent = false,
   onCollectProof,
   proofCollectionState = "idle",
+  onClickMacroFixApplied,
+  onMacroValuesChange,
 }: AuditPanelProps) {
   // Track the "base tag" for macro detection - the original tag before any macro replacements
   const [baseTag, setBaseTag] = useState(tag);
   const [macroValues, setMacroValues] = useState<Record<string, string>>({});
+
+  // Notify parent when macro values change
+  useEffect(() => {
+    onMacroValuesChange?.(macroValues);
+  }, [macroValues, onMacroValuesChange]);
 
   // Track the "base macros" - the original macros before any values were applied
   // This prevents macros from disappearing when reloaded with values
@@ -687,6 +698,7 @@ export function AuditPanel({
                   // Update the tag with the fix and reload
                   onReloadWithChanges?.(fixedTag);
                 }}
+                onClickMacroFixApplied={onClickMacroFixApplied}
               />
             </TabsContent>
           </Tabs>

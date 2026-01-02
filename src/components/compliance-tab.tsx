@@ -26,6 +26,7 @@ interface ComplianceTabProps {
   hasContent?: boolean;
   currentTag?: string | null;
   onTagFix?: (fixedTag: string) => void;
+  onClickMacroFixApplied?: () => void;
 }
 
 export function ComplianceTab({
@@ -37,6 +38,7 @@ export function ComplianceTab({
   hasContent = false,
   currentTag,
   onTagFix,
+  onClickMacroFixApplied,
 }: ComplianceTabProps) {
   const dspOptions = getDSPOptions();
   const dspRules = getDSPRules(selectedDSP);
@@ -91,12 +93,13 @@ export function ComplianceTab({
       onTagFix(fixedTag);
       setShowFixedTag(false);
       setFixApplied(true); // Mark that fix was applied
+      onClickMacroFixApplied?.(); // Notify parent that click macro fix was applied
       // Re-run compliance after a short delay to let the tag load
       setTimeout(() => {
         onRun?.();
       }, 500);
     }
-  }, [fixedTag, onTagFix, onRun]);
+  }, [fixedTag, onTagFix, onRun, onClickMacroFixApplied]);
 
   // Reset fixed tag state when tag changes externally
   const resetFixedState = useCallback(() => {
