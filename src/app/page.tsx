@@ -622,6 +622,14 @@ export default function Home() {
 
   // Handle macro replacement - updates tag and reloads
   const handleMacrosChange = useCallback((modifiedTag: string) => {
+    // Store current text modifications to re-apply after reload
+    textElements.forEach(el => {
+      if (el.currentText !== el.originalText) {
+        pendingTextModsRef.current.set(el.originalText, el.currentText);
+      }
+    });
+    console.log("[Fix] Stored", pendingTextModsRef.current.size, "text modifications before tag fix reload");
+    
     setTagValue(modifiedTag);
     // For macro changes, the tag content is different, so the effect will trigger
     // No need to increment previewKey
@@ -638,7 +646,7 @@ export default function Home() {
       pixels: [],
       sourceContent: modifiedTag,
     });
-  }, []);
+  }, [textElements]);
 
   // Handle sample tag selection from sample browser
   const handleSelectSampleTag = useCallback((tag: string, tagWidth: number, tagHeight: number) => {
@@ -1244,10 +1252,32 @@ export default function Home() {
       // Get vendor info
       const vendorInfo = loadedTag ? detectVendor(loadedTag) : null;
 
-      // Determine if tag was modified (fix applied)
+      // Determine if tag was modified (fix applied or text personalized)
       const originalTag = originalTagRef.current ?? loadedTag;
       const currentTag = loadedTag;
-      const wasModified = originalTag !== currentTag;
+      const tagWasFixed = originalTag !== currentTag;
+      const hasTextChanges = capturedTextChanges.length > 0;
+      
+      // Generate modified tag: either from compliance fix OR by applying text changes
+      let modifiedTag: string | undefined;
+      if (tagWasFixed) {
+        // Tag was modified via compliance fix
+        modifiedTag = currentTag ?? undefined;
+      } else if (hasTextChanges && originalTag) {
+        // Apply text changes to original tag source to create modified version
+        let tagWithTextChanges = originalTag;
+        for (const change of capturedTextChanges) {
+          // Simple string replacement - may need escaping for special chars
+          tagWithTextChanges = tagWithTextChanges.replace(
+            change.original,
+            change.current
+          );
+        }
+        // Only set modifiedTag if changes were actually applied
+        if (tagWithTextChanges !== originalTag) {
+          modifiedTag = tagWithTextChanges;
+        }
+      }
 
       // Build proof pack data
       const proofData: ProofPackData = {
@@ -1258,8 +1288,8 @@ export default function Home() {
         events: mraidEvents,
         macros,
         originalTag: originalTag ?? undefined,
-        modifiedTag: wasModified ? (currentTag ?? undefined) : undefined,
-        textChanges: capturedTextChanges.length > 0 ? capturedTextChanges : undefined,
+        modifiedTag,
+        textChanges: hasTextChanges ? capturedTextChanges : undefined,
         metadata: {
           timestamp: new Date().toLocaleString(),
           timestampISO: new Date().toISOString(),

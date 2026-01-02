@@ -105,7 +105,6 @@ export async function generateProofPack(
     const complianceJson = JSON.stringify(
       {
         overallStatus: data.compliance.overallStatus,
-        dsp: data.compliance.dsp,
         checks: data.compliance.checks.map((c) => ({
           id: c.id,
           name: c.name,
