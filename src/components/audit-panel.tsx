@@ -316,14 +316,14 @@ export function AuditPanel({
             <div className="flex items-center gap-1">
               {/* Collect Proof Button */}
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 onClick={onCollectProof}
                 disabled={!hasContent || proofCollectionState !== "idle"}
                 className={`h-6 px-2 text-[10px] ${
-                  proofCollectionState !== "idle" 
-                    ? "text-cyan-400" 
-                    : "text-foreground/50 hover:text-foreground"
+                  proofCollectionState !== "idle"
+                    ? "text-cyan-400 border-cyan-400/50"
+                    : "text-foreground/70 hover:text-foreground"
                 }`}
               >
                 {proofCollectionState === "idle" ? (
