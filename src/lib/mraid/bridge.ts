@@ -274,6 +274,35 @@ export function generateMRAIDBridge(options: MRAIDBridgeOptions): string {
     setTimeout(fireEvents, 0);
   }
 
+  // Intercept window.open to prevent actual navigation
+  // Log to parent instead for the event log
+  var originalWindowOpen = window.open;
+  window.open = function(url, target, features) {
+    mraid._notifyParent('window.open', [url, target]);
+    console.log('[MRAID Mock] Intercepted window.open:', url);
+    // Return a mock window object to prevent errors
+    return {
+      closed: false,
+      close: function() { this.closed = true; },
+      focus: function() {},
+      blur: function() {}
+    };
+  };
+
+  // Also intercept anchor clicks that would navigate away
+  document.addEventListener('click', function(e) {
+    var target = e.target;
+    while (target && target.tagName !== 'A') {
+      target = target.parentElement;
+    }
+    if (target && target.href && !target.href.startsWith('javascript:')) {
+      e.preventDefault();
+      e.stopPropagation();
+      mraid._notifyParent('anchor', [target.href, target.target || '_self']);
+      console.log('[MRAID Mock] Intercepted anchor click:', target.href);
+    }
+  }, true);
+
   console.log('[MRAID Mock] Initialized');
 
 })();

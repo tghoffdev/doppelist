@@ -22,8 +22,8 @@ export function runClickTrackingChecks(
       }
     }
 
-    // Also check for common clickTag patterns
-    if (/window\.clickTag|clickTAG/i.test(sourceContent)) {
+    // Also check for common clickTag patterns (var clickTag, window.clickTag, clickTAG)
+    if (/(?:var|let|const|window\.)\s*clickTag|clickTAG/i.test(sourceContent)) {
       foundMacros.push("clickTag");
     }
   }
@@ -65,41 +65,8 @@ export function runClickTrackingChecks(
     });
   }
 
-  // Check for click events fired during preview
-  const clickEvents = clicks.filter(
-    (c) => c.type === "mraid.open" || c.type === "window.open" || c.type === "anchor"
-  );
-
-  if (clickEvents.length > 0) {
-    checks.push({
-      id: "click-handler",
-      category: "click-tracking",
-      name: "Click Handler",
-      description: "Ad has functional click handling",
-      status: "pass",
-      details: `${clickEvents.length} click event(s) detected`,
-      items: clickEvents.slice(0, 5).map((c) => ({
-        label: c.type,
-        value: c.url ? truncateUrl(c.url) : "no URL",
-        status: "pass",
-      })),
-    });
-  } else {
-    // Not a failure - clicks may not have been triggered during preview
-    checks.push({
-      id: "click-handler",
-      category: "click-tracking",
-      name: "Click Handler",
-      description: "Click handlers fire when ad is clicked",
-      status: "pending",
-      details: "No clicks detected yet - try clicking the ad",
-    });
-  }
+  // Note: Click events are tracked in the MRAID event log, not as a compliance check
+  // since they depend on user interaction during preview
 
   return checks;
-}
-
-function truncateUrl(url: string, maxLength: number = 40): string {
-  if (url.length <= maxLength) return url;
-  return url.slice(0, maxLength - 3) + "...";
 }

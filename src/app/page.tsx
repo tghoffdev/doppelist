@@ -145,10 +145,20 @@ export default function Home() {
   const recordingStartTimeRef = useRef<number>(0);
 
   // Refs to track current dimensions and format for recording (avoids stale closures)
-  const dimensionsRef = useRef({ width, height });
-  dimensionsRef.current = { width, height };
+  // For expandable format, use expanded dimensions since that's the container size
+  const recordingWidth = formatType === "expandable" ? expandedWidth : width;
+  const recordingHeight = formatType === "expandable" ? expandedHeight : height;
+  const dimensionsRef = useRef({ width: recordingWidth, height: recordingHeight });
+  dimensionsRef.current = { width: recordingWidth, height: recordingHeight };
   const outputFormatRef = useRef(outputFormat);
   outputFormatRef.current = outputFormat;
+  // Flag to auto-run compliance after reload
+  const autoRunComplianceRef = useRef(false);
+  // Refs for compliance auto-run (to avoid stale closures)
+  const complianceDataRef = useRef(complianceData);
+  complianceDataRef.current = complianceData;
+  const selectedDSPRef = useRef(selectedDSP);
+  selectedDSPRef.current = selectedDSP;
 
   // Recording hook - use ref for dimensions to avoid stale closure
   const recorder = useRecorder({
@@ -218,10 +228,10 @@ export default function Home() {
     return () => window.removeEventListener("message", handleMessage);
   }, [formatType]);
 
-  // Clear MRAID events and compliance data when tag changes
+  // Clear MRAID events and compliance result when tag changes
+  // (complianceData is set by the load handlers, not cleared here)
   useEffect(() => {
     setMraidEvents([]);
-    setComplianceData(createEmptyComplianceData());
     setComplianceResult(null);
     setIsExpanded(false); // Reset expanded state on new content
   }, [loadedTag, html5Url]);
@@ -305,6 +315,28 @@ export default function Home() {
         setLoadedTag(null);
         setIsAdReady(false);
 
+        // Set compliance data for HTML5 bundle
+        // Reset timing completely - don't preserve old mraidReady from previous load
+        const complianceFiles: FileInfo[] = Object.entries(result.files).map(
+          ([path, data]) => ({
+            path,
+            size: data.content?.length || 0,
+            contentType: data.contentType || "application/octet-stream",
+          })
+        );
+        // Gather source content from all JS/HTML files for macro detection
+        const sourceContent = Object.entries(result.files)
+          .filter(([path]) => /\.(js|html|htm)$/i.test(path))
+          .map(([, data]) => data.content || "")
+          .join("\n");
+        setComplianceData({
+          files: complianceFiles,
+          timing: { loadStart: Date.now() },
+          clicks: [],
+          pixels: [],
+          sourceContent,
+        });
+
         // Load files into service worker
         await loadHtml5Ad(result.files, { width, height });
 
@@ -356,6 +388,17 @@ export default function Home() {
       }
       console.log("[Page] Setting loadedTag:", trimmedTag.substring(0, 100) + "...");
 
+      // Set compliance data for inline tags (file size and load start time)
+      // Reset timing completely - don't preserve old mraidReady from previous load
+      const tagBytes = new Blob([trimmedTag]).size;
+      setComplianceData({
+        files: [{ path: "inline-tag.html", size: tagBytes, contentType: "text/html" }],
+        timing: { loadStart: Date.now() },
+        clicks: [],
+        pixels: [],
+        sourceContent: trimmedTag,
+      });
+
       // Only increment previewKey if loading the SAME tag (reload)
       // Otherwise, the tag change itself will trigger the effect
       const isReload = loadedTag === trimmedTag;
@@ -406,6 +449,18 @@ export default function Home() {
       setHtml5Url(null);
       setHtml5EntryPoint(null);
     }
+
+    // Set compliance data for inline tags
+    const tagBytes = new Blob([tag]).size;
+    setComplianceData((prev) => ({
+      ...prev,
+      files: [{ path: "inline-tag.html", size: tagBytes, contentType: "text/html" }],
+      timing: {
+        ...prev.timing,
+        loadStart: Date.now(),
+      },
+    }));
+
     // Set and load the tag
     // Note: Don't increment previewKey here - that's only for reloading the same tag
     // The tag change itself will trigger the PreviewFrame effect
@@ -558,6 +613,31 @@ export default function Home() {
         mraidReady: Date.now(),
       },
     }));
+
+    // Auto-run compliance if flagged (from reload & recheck)
+    if (autoRunComplianceRef.current) {
+      autoRunComplianceRef.current = false;
+      // Defer to next tick so timing state is updated
+      setTimeout(() => {
+        const iframe = previewFrameRef.current?.getIframe();
+        let sourceContent: string | undefined;
+        try {
+          sourceContent = iframe?.contentDocument?.documentElement?.outerHTML;
+        } catch {
+          // Cross-origin
+        }
+        // Use refs to get current values without dependency issues
+        complianceEngineRef.current.setDSP(selectedDSPRef.current);
+        const currentData = complianceDataRef.current;
+        const data: ComplianceData = {
+          ...currentData,
+          timing: { ...currentData.timing, mraidReady: Date.now() },
+          sourceContent,
+        };
+        const result = complianceEngineRef.current.runChecks(data);
+        setComplianceResult(result);
+      }, 100);
+    }
   }, [scanAd, html5Url, loadedTag, width, height]);
 
   const handleResize = useCallback((newWidth: number, newHeight: number) => {
@@ -604,6 +684,17 @@ export default function Home() {
       setComplianceResult(result);
     }
   }, [complianceResult]);
+
+  // Reload ad and re-run compliance checks
+  const handleReloadAndRecheck = useCallback(() => {
+    if (!loadedTag && !html5Url) return;
+    // Clear current result
+    setComplianceResult(null);
+    // Set flag to auto-run compliance when ad is ready
+    autoRunComplianceRef.current = true;
+    // Reload the ad
+    handleReload();
+  }, [loadedTag, html5Url, handleReload]);
 
   const handleScreenshot = useCallback(async () => {
     const container = previewFrameRef.current?.getContainer();
@@ -1125,6 +1216,7 @@ export default function Home() {
                 isHtml5={!!html5Url}
                 complianceResult={complianceResult}
                 onRunCompliance={handleRunCompliance}
+                onReloadAndRecheck={handleReloadAndRecheck}
                 selectedDSP={selectedDSP}
                 onDSPChange={handleDSPChange}
                 hasContent={!!(loadedTag || html5Url)}

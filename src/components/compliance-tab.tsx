@@ -14,6 +14,7 @@ import {
 interface ComplianceTabProps {
   result?: ComplianceResult | null;
   onRun?: () => void;
+  onReload?: () => void;
   selectedDSP?: string;
   onDSPChange?: (dsp: string) => void;
   hasContent?: boolean;
@@ -22,6 +23,7 @@ interface ComplianceTabProps {
 export function ComplianceTab({
   result,
   onRun,
+  onReload,
   selectedDSP = "generic",
   onDSPChange,
   hasContent = false,
@@ -83,14 +85,14 @@ export function ComplianceTab({
             </div>
           </div>
 
-          {/* Re-run button */}
+          {/* Re-run button - reloads ad and re-runs checks */}
           <Button
-            onClick={onRun}
-            variant="ghost"
+            onClick={onReload}
+            variant="outline"
             size="sm"
-            className="w-full text-xs h-6 text-foreground/50"
+            className="w-full text-xs h-7"
           >
-            Re-run Checks
+            Reload & Re-check
           </Button>
 
           {/* Individual Checks */}
@@ -147,7 +149,7 @@ function ComplianceCheckItem({ check }: ComplianceCheckItemProps) {
             check.status
           )}`}
         >
-          {getStatusIcon(check.status)}{" "}
+          {check.status === "pending" ? "..." : getStatusIcon(check.status)}{" "}
           {check.status === "pass"
             ? "Pass"
             : check.status === "fail"
@@ -155,7 +157,7 @@ function ComplianceCheckItem({ check }: ComplianceCheckItemProps) {
             : check.status === "warn"
             ? "Warn"
             : check.status === "pending"
-            ? "..."
+            ? ""
             : "Skip"}
         </span>
       </div>
@@ -203,6 +205,7 @@ function getOverallStatusLabel(
 ): string {
   const failCount = checks.filter((c) => c.status === "fail").length;
   const warnCount = checks.filter((c) => c.status === "warn").length;
+  const pendingCount = checks.filter((c) => c.status === "pending").length;
 
   switch (status) {
     case "pass":

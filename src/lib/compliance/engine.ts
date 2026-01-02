@@ -62,11 +62,13 @@ export class ComplianceEngine {
   }
 
   private computeOverallStatus(checks: ComplianceCheck[]): CheckStatus {
-    // Priority: fail > warn > pending > skipped > pass
+    // Priority: fail > warn > skipped > pass
+    // Note: "pending" checks (waiting for user action) don't block overall status
     if (checks.some((c) => c.status === "fail")) return "fail";
     if (checks.some((c) => c.status === "warn")) return "warn";
-    if (checks.some((c) => c.status === "pending")) return "pending";
-    if (checks.every((c) => c.status === "skipped")) return "skipped";
+    // If all non-pending checks are skipped, return skipped
+    const nonPendingChecks = checks.filter((c) => c.status !== "pending");
+    if (nonPendingChecks.length > 0 && nonPendingChecks.every((c) => c.status === "skipped")) return "skipped";
     return "pass";
   }
 }

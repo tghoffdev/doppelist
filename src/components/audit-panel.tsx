@@ -67,6 +67,8 @@ interface AuditPanelProps {
   complianceResult?: ComplianceResult | null;
   /** Run compliance checks */
   onRunCompliance?: () => void;
+  /** Reload ad and re-run compliance checks */
+  onReloadAndRecheck?: () => void;
   /** Selected DSP for compliance rules */
   selectedDSP?: string;
   /** Change selected DSP */
@@ -92,6 +94,7 @@ export function AuditPanel({
   isHtml5 = false,
   complianceResult,
   onRunCompliance,
+  onReloadAndRecheck,
   selectedDSP = "generic",
   onDSPChange,
   hasContent = false,
@@ -601,6 +604,7 @@ export function AuditPanel({
               <ComplianceTab
                 result={complianceResult}
                 onRun={onRunCompliance}
+                onReload={onReloadAndRecheck}
                 selectedDSP={selectedDSP}
                 onDSPChange={onDSPChange}
                 hasContent={hasContent}

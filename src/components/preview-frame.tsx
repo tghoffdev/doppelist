@@ -414,13 +414,6 @@ export const PreviewFrame = forwardRef<PreviewFrameHandle, PreviewFrameProps>(
                 style={{ border: isExpanded ? "none" : `1px solid ${borderColor}` }}
               />
 
-              {/* Tap to expand hint - only when collapsed */}
-              {!isExpanded && tag && (
-                <div className="absolute bottom-1 right-1 text-[8px] text-white/80 bg-black/50 px-1.5 py-0.5 rounded">
-                  Tap to expand
-                </div>
-              )}
-
               {/* Close button - only when expanded */}
               {isExpanded && (
                 <button

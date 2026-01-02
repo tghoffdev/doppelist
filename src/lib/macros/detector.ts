@@ -90,10 +90,10 @@ const MACRO_PATTERNS: MacroPattern[] = [
     regex: /@\{([A-Z][A-Z0-9_]{2,})\}/g,
     extract: (m) => m[1],
   },
-  // window.clickTag / window.clickTAG / window.clickTag1, etc. - HTML5 bundle click tracking
+  // clickTag declarations - var/let/const clickTag or window.clickTag - HTML5 bundle click tracking
   {
     format: "clicktag",
-    regex: /window\.(clickTag\d*|clickTAG\d*)\b/g,
+    regex: /(?:(?:var|let|const)\s+|window\.)(clickTag\d*|clickTAG\d*)\b/g,
     extract: (m) => m[1].toUpperCase(),
   },
   // ?clickTag= or ?name= - Query param based macros in HTML5
