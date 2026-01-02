@@ -159,6 +159,8 @@ export default function Home() {
   complianceDataRef.current = complianceData;
   const selectedDSPRef = useRef(selectedDSP);
   selectedDSPRef.current = selectedDSP;
+  const loadedTagRef = useRef(loadedTag);
+  loadedTagRef.current = loadedTag;
 
   // Recording hook - use ref for dimensions to avoid stale closure
   const recorder = useRecorder({
@@ -596,11 +598,12 @@ export default function Home() {
 
   const handleAdReady = useCallback(() => {
     setIsAdReady(true);
-    // Track ad load
+    // Track ad load (use ref for loadedTag to avoid dependency)
+    const currentTag = loadedTagRef.current;
     if (html5Url) {
       analytics.html5Load(width, height);
-    } else if (loadedTag) {
-      const vendorInfo = detectVendor(loadedTag);
+    } else if (currentTag) {
+      const vendorInfo = detectVendor(currentTag);
       analytics.tagLoad(vendorInfo.platform, width, height);
     }
     // If we're waiting for ad ready (reload-and-record), resolve the promise
@@ -635,11 +638,12 @@ export default function Home() {
         // Use refs to get current values without dependency issues
         complianceEngineRef.current.setDSP(selectedDSPRef.current);
         const currentData = complianceDataRef.current;
+        const tag = loadedTagRef.current;
 
         // For inline tags, recalculate file size from the tag itself
         let files = currentData.files;
-        if (files.length === 0 && loadedTag) {
-          const tagBytes = new Blob([loadedTag]).size;
+        if (files.length === 0 && tag) {
+          const tagBytes = new Blob([tag]).size;
           files = [{ path: "inline-tag.html", size: tagBytes, contentType: "text/html" }];
         }
 
@@ -653,7 +657,7 @@ export default function Home() {
         setComplianceResult(result);
       }, 150);
     }
-  }, [scanAd, html5Url, loadedTag, width, height]);
+  }, [scanAd, html5Url, width, height]);
 
   const handleResize = useCallback((newWidth: number, newHeight: number) => {
     setWidth(newWidth);
